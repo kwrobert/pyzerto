@@ -55,7 +55,7 @@ from localsite import LocalSite             # NOQA
 from peersite import PeerSite               # NOQA
 from event import Event                     # NOQA
 from task import Task                       # NOQA
-from vm import VM                           # NOQA
+from vm import VM, UnprotectedVM                           # NOQA
 from vpg import VPG                         # NOQA
 from vra import VRA                         # NOQA
 from zorg import ZORG                       # NOQA
@@ -268,8 +268,23 @@ class Zerto(object):
         if vmid is not None:
             req = self.get_request('v1/vms/{0}'.format(vmid))
             return VM(**req.json())
-        req = self.get_request('v1/vms', params=(kwargs or None))
-        return list([VM(**res) for res in req.json()])
+        # Get protected VMs
+        prot_vms = self.get_request('v1/vms', params=(kwargs or None))
+        return [VM(**vm_resp) for vm_resp in prot_vms.json()]
+
+    def get_unprotected_vm(self, **kwargs):
+        """
+        Retrieve unprotected VMs
+        """
+
+        # Get unprotected VMs
+        VMs = []
+        for vs in self.get_virtualization_site():
+            path = '/v1/virtualizationsites/{}/vms'.format(vs.identifier)
+            unprot_vms = self.get_request(path, params=(kwargs or None))
+            for vm_resp in unprot_vms.json():
+                VMs.append(UnprotectedVM(**vm_resp))
+        return VMs
 
     def get_vpg(self, vpgid=None, **kwargs):
         '''Retrieve specific vpg or all'''

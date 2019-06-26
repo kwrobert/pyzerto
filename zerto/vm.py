@@ -32,5 +32,18 @@ class VM(ZertoObject):
         return 'name={0}, identifier={1}, status={2}, sub_status={3}'.format(
             self.name, self.identifier, self.status, self.sub_status)
 
+class UnprotectedVM(ZertoObject):
+
+    def __init__(self, **kwargs):
+        self.values = kwargs
+        self.name = kwargs['VmName']
+        self.identifier = kwargs['VmIdentifier']
+        self.entities = {}
+        for k, v in (kwargs.get('Entities') or {}).iteritems():
+            self.entities[k] = site_type[v]
+
+    def __str__(self):
+        return 'name={0}, identifier={1}'.format(self.name, self.identifier)
+
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
