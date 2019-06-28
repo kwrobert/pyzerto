@@ -60,7 +60,7 @@ from vpg import VPG                         # NOQA
 from vra import VRA                         # NOQA
 from zorg import ZORG                       # NOQA
 from serviceprofile import ServiceProfile   # NOQA
-from virtualization_site import VirtualizationSite  # NOQA
+from virtualization_site import VirtualizationSite # NOQA
 
 
 class Zerto(object):
@@ -97,6 +97,7 @@ class Zerto(object):
             kwargs['verify'] = False
 
         req = getattr(requests, method.lower())(url, **kwargs)
+        txt = req.text
         if req.status_code == 200:
             return req
         try:
@@ -128,7 +129,7 @@ class Zerto(object):
                 method.upper(), path, params, data)
         if 500 <= req.status_code < 600:
             raise ZertoFailure(
-                req.status_code, req.errcode, req.errmsg,
+                req.status_code, req.errcode, req.errmsg, req.text,
                 method.upper(), path, params, data)
         raise ZertoServiceError(
             req.status_code, req.errcode, req.errmsg,
@@ -138,7 +139,7 @@ class Zerto(object):
         return self._do_request('GET', path, **kwargs)
 
     def post_request(self, path, data=None, **kwargs):
-        return self._do_request('POST', path, data, **kwargs)
+        return self._do_request('POST', path, data=data, **kwargs)
 
     def put_request(self, path, data=None, **kwargs):
         return self._do_request('PUT', path, data, **kwargs)
@@ -255,13 +256,35 @@ class Zerto(object):
         req = self.get_request('v1/tasks', params=(kwargs or None))
         return list([Task(**res) for res in req.json()])
 
-    def get_virtualization_site(self, siteid=None):
+    def get_virtualization_site(self, siteid=None, get_info=False):
+        keys = ("datastoreclusters",
+                "datastores",
+                "folders",
+                "hostclusters",
+                "hosts",
+                "networks",
+                "resourcepools",
+                "vms")
         if siteid is not None:
             req = self.get_request(
                 'v1/virtualizationsites/{0}'.format(siteid))
-            return VirtualizationSite(**req.json())
+            kwargs = req.json()
+            if get_info:
+                for k in keys:
+                    path = 'v1/virtualizationsites/{0}/{1}'.format(siteid, k)
+                    subreq = self.get_request(path)
+                    kwargs[k] = subreq.json()
+            return VirtualizationSite(**kwargs)
         req = self.get_request('v1/virtualizationsites')
-        return list([VirtualizationSite(**res) for res in req.json()])
+        kwarglist = [res for res in req.json()]
+        if get_info:
+            for d in kwarglist:
+                ID = d["SiteIdentifier"]
+                for k in keys: 
+                    path = 'v1/virtualizationsites/{0}/{1}'.format(ID, k)
+                    subreq = self.get_request(path)
+                    d[k] = [resp for resp in subreq.json()]
+        return [VirtualizationSite(**kwargs) for kwargs in kwarglist]
 
     def get_vm(self, vmid=None, **kwargs):
         '''Retrieve specific vm or all'''
@@ -325,6 +348,46 @@ class Zerto(object):
                 params=(kwargs or None),
             )
         return req.json()
+
+    def create_vpg_settings(self, data, **kwargs):
+        """
+        Create a VPG via a POST request using the vpgSettings API
+
+        Returns
+        -------
+
+        resp : dict 
+         A dict of response from API containing vpgSettingsIdentifier
+        """
+
+        # Make the initial object
+        try:
+            resp = self.post_request('v1/vpgSettings', json=data, params=(kwargs or None))
+        except ZertoFailure as e:
+            print(e)
+            print(e.message)
+            print(e.errmsg)
+            print(e.errcode)
+            print(e.status_code)
+            raise
+        except:
+            raise
+        vpgid = resp.json()
+        # Now commit it
+        try:
+            path = 'v1/vpgSettings/{}/commit'.format(vpgid)
+            resp = self.post_request(path, json=data, params=(kwargs or None))
+        except ZertoFailure as e:
+            print(e)
+            print(e.message)
+            print(e.errmsg)
+            print(e.errcode)
+            print(e.status_code)
+            raise
+        except:
+            raise
+        return resp
+
 
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

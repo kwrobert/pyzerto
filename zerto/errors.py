@@ -76,7 +76,30 @@ class ZertoMethodNotAllowed(Zerto4xx):
 
 
 class ZertoFailure(ZertoServiceError):
-    pass
+
+    def __init__(self, status_code, errcode, errmsg, text, *args):
+        super(ZertoServiceError, self).__init__(
+            status_code, errcode, errmsg, *args)
+        self.status_code = status_code
+        self.errcode = errcode
+        self.errmsg = errmsg
+        if errmsg:
+            if errcode:
+                self.message = "{0}: {1}".format(
+                    errcode, errmsg)
+            else:
+                self.message = str(errmsg)
+        elif errcode:
+            self.message = str(errcode)
+        elif status_code:
+            self.message = str(status_code)
+        if text:
+            self.message += "\nResponse: {}".format(text)
+
+    def __str__(self):
+        if self.message:
+            return self.message
+        return repr(self)
 
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
